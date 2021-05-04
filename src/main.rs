@@ -16,4 +16,7 @@ fn main() {
     let g = Polynomial { length: 3, terms: v2 };
 
     println!("An example of polynomial addition: {}", add_polys(&f, &g).to_string());
+
+    let p1 = "1x^3 + 4x^2y^1 + 8x^1y^2";
+    println!("The polynomial {} after everything is {}", p1, Polynomial::from_string(p1).to_string());
 }

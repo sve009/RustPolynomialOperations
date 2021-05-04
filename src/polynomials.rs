@@ -1,3 +1,7 @@
+use std::collections::BinaryHeap;
+use std::cmp::Ordering;
+
+#[derive(Eq)]
 pub struct Monomial {
     pub coefficient: i64,
     pub degree: Vec<u16>,
@@ -6,6 +10,51 @@ pub struct Monomial {
 impl Monomial {
     pub fn get_degree(&self) -> &Vec<u16> {
         &self.degree
+    }
+}
+
+impl Ord for Monomial {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let d1 = &self.degree;
+        let d2 = &other.degree;
+
+        for (a, b) in d1.iter().zip(d2) {
+            if a < &b {
+                return Ordering::Less;
+            } else if a > &b {
+                return Ordering::Greater;
+            } else {
+                continue;
+            }
+        }
+        Ordering::Equal
+    }
+}
+
+impl PartialOrd for Monomial {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let d1 = &self.degree;
+        let d2 = &other.degree;
+
+        for (a, b) in d1.iter().zip(d2) {
+            if a < &b {
+                return Some(Ordering::Less);
+            } else if a > &b {
+                return Some(Ordering::Greater);
+            } else {
+                continue;
+            }
+        }
+        Some(Ordering::Equal)
+    }
+}
+
+impl PartialEq for Monomial {
+    fn eq(&self, other: &Self) -> bool {
+        self.coefficient == other.coefficient &&
+            self.degree.iter().zip(&other.degree)
+            .map(|(x, y)| x == y)
+            .fold(true, |x, y| x && y)
     }
 }
 
@@ -39,6 +88,33 @@ pub struct Polynomial {
 impl Polynomial {
     pub fn get_terms(&self) -> &Vec<Monomial> {
         &self.terms
+    }
+    pub fn from_string(s: &str) -> Polynomial {
+        let terms: Vec<Monomial> = s.split("+")
+            .map(|s| s.trim())
+            .map(|s| {
+                let (h, mut t) = s.split_at(s.find(|c: char| c.is_alphabetic()).unwrap());
+                println!("h: {}, t: {}", h, t);
+                let c = h.parse::<i64>().unwrap();
+
+                let mut v = Vec::new();
+
+                while let Some(i) = t.find('^') {
+                    t = t.split_at(i + 1).1;
+                    t = match t.find(|c: char| c.is_alphabetic()) {
+                        Some(j) => {
+                            v.push(t.split_at(j).0.parse::<u16>().unwrap());
+                            t.split_at(j).1
+                        }
+                        None => {
+                            v.push(t.parse::<u16>().unwrap());
+                            ""
+                        }
+                    };
+                }
+                Monomial { coefficient: c, degree: v }
+            }).collect();
+        Polynomial { length: terms.len(), terms: terms }
     }
 }
 
@@ -86,7 +162,9 @@ fn combine_terms(v: &mut Vec<Monomial>) {
     let mut n = 1;
     while n < v.len() {
         if deg_eq(v[n].get_degree(), v[n - 1].get_degree()) {
-            v0.push(Monomial { coefficient: v[n].coefficient + v[n - 1].coefficient, degree: v[n].get_degree().to_vec()});
+            if v[n].coefficient + v[n - 1].coefficient != 0 {
+                v0.push(Monomial { coefficient: v[n].coefficient + v[n - 1].coefficient, degree: v[n].get_degree().to_vec()});
+            }
         } else {
             v0.push(v[n].clone());
         }
@@ -128,5 +206,38 @@ pub fn add_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
         length: v.len(),
         terms: v,
     }
+}
+
+pub fn mult_monoms(f : &Monomial, g: &Monomial) -> Monomial {
+    Monomial {
+        coefficient: f.coefficient * g.coefficient,
+        degree: f.degree.iter().zip(&g.degree).map(|(x, y)| x + y).collect(),
+    }
+}
+
+pub fn mult_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
+    let t1 = &f.terms;
+    let t2 = &g.terms;
+
+    let mut c = Polynomial { length: 0, terms: Vec::new() };
+
+    let mut h = BinaryHeap::new();
+    let mut fs = vec![0; t1.len()];
+
+    for i in (0..t1.len()) {
+        h.push((mult_monoms(&t1[i], &t2[1]), i));
+    }
+
+    while let Some((d, s)) = h.pop() {
+        let p = Polynomial { length: 0, terms: vec![d] };
+        c = add_polys(&c, &p);
+
+        if fs[s] < t2.len() {
+            fs[s] += 1;
+            h.push((mult_monoms(&t1[s], &t2[fs[s]]), s));
+        }
+    }
+                   
+    c
 }
 
