@@ -1,15 +1,60 @@
-use std::collections::BinaryHeap;
+extern crate rug;
+
 use std::cmp::Ordering;
+use rug::Rational;
+
+#[derive(PartialEq)]
+pub struct PolySet(pub Vec<Polynomial>);
+
+impl ToString for PolySet {
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+
+        s += "{ ";
+
+        for i in 0..self.0.len()-1 {
+            s += &self.0[i].to_string();
+            s += ", ";
+        }
+
+        s += &self.0[self.0.len() - 1].to_string();
+        s += " }";
+
+        s
+    }
+}
+
 
 #[derive(Eq)]
 pub struct Monomial {
-    pub coefficient: i64,
+    pub coefficient: rug::Rational,
     pub degree: Vec<u16>,
 }
 
 impl Monomial {
     pub fn get_degree(&self) -> &Vec<u16> {
         &self.degree
+    }
+    pub fn from_string(s: &str) -> Monomial {
+        let (h, mut t) = s.split_at(s.find(|c: char| c.is_alphabetic()).unwrap());
+        let c = h.parse::<i64>().unwrap();
+
+        let mut v = Vec::new();
+
+        while let Some(i) = t.find('^') {
+            t = t.split_at(i + 1).1;
+            t = match t.find(|c: char| c.is_alphabetic()) {
+                Some(j) => {
+                    v.push(t.split_at(j).0.parse::<u16>().unwrap());
+                    t.split_at(j).1
+                }
+                None => {
+                    v.push(t.parse::<u16>().unwrap());
+                    ""
+                }
+            };
+        }
+        Monomial { coefficient: Rational::from(c), degree: v }
     }
 }
 
@@ -19,9 +64,9 @@ impl Ord for Monomial {
         let d2 = &other.degree;
 
         for (a, b) in d1.iter().zip(d2) {
-            if a < &b {
+            if a < b {
                 return Ordering::Less;
-            } else if a > &b {
+            } else if a > b {
                 return Ordering::Greater;
             } else {
                 continue;
@@ -37,9 +82,9 @@ impl PartialOrd for Monomial {
         let d2 = &other.degree;
 
         for (a, b) in d1.iter().zip(d2) {
-            if a < &b {
+            if a < b {
                 return Some(Ordering::Less);
-            } else if a > &b {
+            } else if a > b {
                 return Some(Ordering::Greater);
             } else {
                 continue;
@@ -61,7 +106,7 @@ impl PartialEq for Monomial {
 impl Clone for Monomial {
     fn clone(&self) -> Self {
         Monomial {
-            coefficient: self.coefficient,
+            coefficient: self.coefficient.clone(),
             degree: self.degree.clone(),
         }
     }
@@ -72,8 +117,8 @@ impl ToString for Monomial {
         let mut s = String::new();
 
         s += &self.coefficient.to_string();
-        for i in (0..(self.degree.len())) {
-            s += &format!("{}{}{}{}", "x", (i+1).to_string(), "^", self.degree[i].to_string());
+        for i in 0..self.degree.len() {
+            s += &format!("({}{}){}{} ", "x", (i+1).to_string(), "^", self.degree[i].to_string());
         }
 
         s
@@ -89,155 +134,59 @@ impl Polynomial {
     pub fn get_terms(&self) -> &Vec<Monomial> {
         &self.terms
     }
-    pub fn from_string(s: &str) -> Polynomial {
+    pub fn from_string(s: &str) -> Self {
         let terms: Vec<Monomial> = s.split("+")
             .map(|s| s.trim())
-            .map(|s| {
-                let (h, mut t) = s.split_at(s.find(|c: char| c.is_alphabetic()).unwrap());
-                println!("h: {}, t: {}", h, t);
-                let c = h.parse::<i64>().unwrap();
-
-                let mut v = Vec::new();
-
-                while let Some(i) = t.find('^') {
-                    t = t.split_at(i + 1).1;
-                    t = match t.find(|c: char| c.is_alphabetic()) {
-                        Some(j) => {
-                            v.push(t.split_at(j).0.parse::<u16>().unwrap());
-                            t.split_at(j).1
-                        }
-                        None => {
-                            v.push(t.parse::<u16>().unwrap());
-                            ""
-                        }
-                    };
-                }
-                Monomial { coefficient: c, degree: v }
-            }).collect();
+            .map(|s| Monomial::from_string(s)).collect();
         Polynomial { length: terms.len(), terms: terms }
+    }
+    pub fn from_monom(m: Monomial) -> Self {
+        Polynomial {
+            length: 1,
+            terms: vec![m],
+        }
+    }
+}
+
+impl PartialEq for Polynomial {
+    fn eq(&self, other: &Self) -> bool {
+        if self.terms.len() == other.terms.len() {
+            self.terms.iter()
+                .zip(&other.terms)
+                .map(|(x, y)| x == y)
+                .fold(true, |x, y| x && y)
+        } else {
+            false
+        }
+    }
+}
+
+impl Clone for Polynomial {
+    fn clone(&self) -> Self {
+        Polynomial {
+            length: self.length,
+            terms: self.terms.clone(),
+        }
     }
 }
 
 impl ToString for Polynomial {
     fn to_string(&self) -> String {
+        if self.terms.len() == 0 {
+            return String::from("0");
+        }
+
         let mut s = String::new();
 
-        println!("Length: {}", &self.terms.len());
-
-        for term in &self.terms {
-            s += &term.to_string();
+        for i in 0..self.terms.len() - 1 {
+            s += &self.terms[i].to_string();
             s += " + ";
         }
+
+        s += &self.terms[self.terms.len() - 1].to_string();
 
         s
     }
 }
 
-fn higher_deg(d1: &Vec<u16>, d2: &Vec<u16>) -> bool {
-    for i in (0..(d1.len())) {
-        if d1[i] > d2[i] {
-            return true;
-        } else if d1[i] < d2[i] {
-            return false;
-        } else {
-            continue;
-        }
-    }
-    true
-}
-
-fn deg_eq(d1: &Vec<u16>, d2: &Vec<u16>) -> bool {
-    for i in (0..(d1.len())) {
-        if d1[i] != d2[i] {
-            return false;
-        }
-    }
-    true
-}
-
-
-fn combine_terms(v: &mut Vec<Monomial>) {
-    let mut v0 = Vec::new();
-
-    let mut n = 1;
-    while n < v.len() {
-        if deg_eq(v[n].get_degree(), v[n - 1].get_degree()) {
-            if v[n].coefficient + v[n - 1].coefficient != 0 {
-                v0.push(Monomial { coefficient: v[n].coefficient + v[n - 1].coefficient, degree: v[n].get_degree().to_vec()});
-            }
-        } else {
-            v0.push(v[n].clone());
-        }
-        n += 1;
-    }
-        
-    *v = v0;
-}
-
-pub fn add_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
-    let t1 = f.get_terms();
-    let t2 = g.get_terms();
-
-    let mut v = Vec::new();
-
-    let mut n1 = 0;
-    let mut n2 = 0;
-
-    while n1 + n2 < t1.len() + t2.len() {
-        if n1 < t1.len() && n2 < t2.len() && higher_deg(t1[n1].get_degree(), t2[n2].get_degree()) {
-            v.push(t1[n1].clone());
-            n1 += 1;
-        } else if n2 < t2.len() {
-            v.push(t2[n2].clone());
-            n2 += 1;
-        } else if n1 < t1.len() {
-            v.push(t1[n1].clone());
-            n1 += 1;
-        }
-    }
-
-    print!("Length before combine: {}", v.len());
-
-    combine_terms(&mut v);
-
-    print!("Length after combine: {}", v.len());
-
-    Polynomial {
-        length: v.len(),
-        terms: v,
-    }
-}
-
-pub fn mult_monoms(f : &Monomial, g: &Monomial) -> Monomial {
-    Monomial {
-        coefficient: f.coefficient * g.coefficient,
-        degree: f.degree.iter().zip(&g.degree).map(|(x, y)| x + y).collect(),
-    }
-}
-
-pub fn mult_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
-    let t1 = &f.terms;
-    let t2 = &g.terms;
-
-    let mut c = Polynomial { length: 0, terms: Vec::new() };
-
-    let mut h = BinaryHeap::new();
-    let mut fs = vec![0; t1.len()];
-
-    for i in (0..t1.len()) {
-        h.push((mult_monoms(&t1[i], &t2[1]), i));
-    }
-
-    while let Some((d, s)) = h.pop() {
-        let p = Polynomial { length: 0, terms: vec![d] };
-        c = add_polys(&c, &p);
-
-        if fs[s] < t2.len() {
-            fs[s] += 1;
-            h.push((mult_monoms(&t1[s], &t2[fs[s]]), s));
-        }
-    }
-                   
-    c
-}
 
