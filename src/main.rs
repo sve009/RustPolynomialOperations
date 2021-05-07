@@ -102,6 +102,12 @@ fn parse_expression_h(x: &str, table: &HashMap<String, Item>) -> Result<Item, Pa
                 (Item::P(p1), Item::Ps(ps)) => Ok(Item::Qsr(divide_poly_set(&p1, &ps))),
                 _ => Err(ParseError::ArgumentError),
             }
+        } else if op == "base" {
+            let ps: Vec<Item> = prep_ps(s, table)?;
+            match &ps[0] {
+                Item::Ps(ps) => Ok(Item::Ps(grobner_basis(&ps))),
+                _ => Err(ParseError::ArgumentError),
+            }
         } else {
             Err(ParseError::InvalidOperation)
         }

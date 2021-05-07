@@ -5,7 +5,7 @@ use super::polynomials::*;
 use std::collections::BinaryHeap;
 use rug::Rational;
 
-fn higher_deg(d1: &Vec<u16>, d2: &Vec<u16>) -> bool {
+fn higher_deg(d1: &[u16], d2: &[u16]) -> bool {
     for i in 0..d1.len() {
         if d1[i] > d2[i] {
             return true;
@@ -18,7 +18,7 @@ fn higher_deg(d1: &Vec<u16>, d2: &Vec<u16>) -> bool {
     true
 }
 
-pub fn deg_eq(d1: &Vec<u16>, d2: &Vec<u16>) -> bool {
+pub fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
     for i in 0..d1.len() {
         if d1[i] != d2[i] {
             return false;
@@ -60,9 +60,9 @@ pub fn add_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     let t1 = f.get_terms();
     let t2 = g.get_terms();
 
-    if t1.len() == 0 {
+    if t1.is_empty() {
         return (*g).clone();
-    } else if t2.len() == 0 {
+    } else if t2.is_empty() {
         return (*f).clone();
     }
 
@@ -102,7 +102,7 @@ pub fn scalar_mult(f: &Polynomial, n: i64) -> Polynomial {
         .collect();
     Polynomial {
         length: terms.len(),
-        terms: terms,
+        terms,
     }
 }
 
@@ -150,13 +150,13 @@ pub fn monom_divides(f: &Monomial, g: &Monomial) -> bool {
     d1.iter()
         .zip(d2)
         .map(|(x, y)| x <= y)
-        .fold(true, |x, y| x && y)
+        .all(|x| x)
 }
 
 pub fn poly_divides(f: &Polynomial, g: &Polynomial) -> bool {
-    if f.terms.len() == 0 {
+    if f.terms.is_empty() {
         return false;
-    } else if g.terms.len() == 0 {
+    } else if g.terms.is_empty() {
         return true;
     }
 
@@ -164,7 +164,7 @@ pub fn poly_divides(f: &Polynomial, g: &Polynomial) -> bool {
 
     g.terms.iter()
         .map(|m2| monom_divides(m1, m2))
-        .fold(false, |x, y| x || y)
+        .any(|x| x)
 
 }
 
@@ -216,4 +216,73 @@ pub fn divide_poly_set(f: &Polynomial, g: &PolySet) -> (PolySet, Polynomial) {
     }
 
     (qs, r)
+}
+
+pub fn s_poly(f: &Polynomial, g: &Polynomial) -> Polynomial {
+    if f.terms.is_empty() {
+        return scalar_mult(g, -1);
+    } else if g.terms.is_empty() {
+        return f.clone();
+    }
+
+    let m1 = &f.terms[0];
+    let m2 = &g.terms[0];
+
+    let deg = m1.degree.iter()
+        .zip(&m2.degree)
+        .map(|(x, y)| {
+            if *x < *y {
+                *y
+            } else {
+                *x
+            }
+        }).collect();
+
+    let m = Monomial { coefficient: Rational::from(1), degree: deg };
+
+    let p1 = Polynomial::from_monom(divide_monoms(&m, m1));
+    let p2 = Polynomial::from_monom(divide_monoms(&m, m2));
+
+    sub_polys(&mult_polys(&p1, f), &mult_polys(&p2, g))
+}
+
+pub fn grobner_basis(ps: &PolySet) -> PolySet {
+    println!("ps: {}", ps.to_string());
+    let mut s = ps.0.clone();
+
+    if s.is_empty() {
+        println!("s empty: {:?}", s);
+        return PolySet(s);
+    }
+
+    let mut g = Vec::new();
+
+    while let Some(f) = s.pop() {
+        println!("f is {}", f.to_string());
+        let (qs, r) = divide_poly_set(&f, &PolySet(g.clone()));
+        println!("r: {}", r.to_string());
+        if !r.terms.is_empty() {
+            for p in g.iter() {
+                s.push(s_poly(&f, &p));
+            }
+            println!("Pushing f: {}", f.to_string());
+            g.push(f);
+        }
+    }
+    reduce(&mut g) 
+}
+
+pub fn reduce(g: &mut Vec<Polynomial>) -> PolySet {
+    let mut gp = Vec::new();
+
+    for i in 0..g.len() {
+        let p = &g[i];
+        let mut gs = g.clone().into_iter()
+            .filter(|x| x != p)
+            .collect();
+        let (_, r) = divide_poly_set(p, &PolySet(gs));
+        gp.push(r);
+    }
+
+    PolySet(gp)
 }

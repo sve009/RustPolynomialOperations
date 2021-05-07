@@ -14,6 +14,10 @@ impl Clone for PolySet {
 
 impl ToString for PolySet {
     fn to_string(&self) -> String {
+        if self.0.is_empty() {
+            return String::from("{}");
+        }
+
         let mut s = String::new();
 
         s += "{ ";
@@ -36,7 +40,7 @@ pub enum MonomError {
     NoAlphaSymbol,
 }
 
-#[derive(Eq)]
+#[derive(Eq, Debug)]
 pub struct Monomial {
     pub coefficient: rug::Rational,
     pub degree: Vec<u16>,
@@ -118,7 +122,7 @@ impl PartialEq for Monomial {
         self.coefficient == other.coefficient &&
             self.degree.iter().zip(&other.degree)
             .map(|(x, y)| x == y)
-            .fold(true, |x, y| x && y)
+            .all(|x| x)
     }
 }
 
@@ -144,6 +148,7 @@ impl ToString for Monomial {
     }
 }
 
+#[derive(Debug)]
 pub struct Polynomial {
     pub length: usize,
     pub terms: Vec<Monomial>,
@@ -154,7 +159,7 @@ impl Polynomial {
         &self.terms
     }
     pub fn from_string(s: &str) -> Result<Self, MonomError> {
-        let terms: Result<Vec<Monomial>, MonomError> = s.split("+")
+        let terms: Result<Vec<Monomial>, MonomError> = s.split('+')
             .map(|s| s.trim())
             .map(|s| Monomial::from_string(s)).collect();
         let t = terms?;
@@ -174,7 +179,7 @@ impl PartialEq for Polynomial {
             self.terms.iter()
                 .zip(&other.terms)
                 .map(|(x, y)| x == y)
-                .fold(true, |x, y| x && y)
+                .all(|x| x) 
         } else {
             false
         }
@@ -192,7 +197,7 @@ impl Clone for Polynomial {
 
 impl ToString for Polynomial {
     fn to_string(&self) -> String {
-        if self.terms.len() == 0 {
+        if self.terms.is_empty() {
             return String::from("0");
         }
 
