@@ -6,10 +6,19 @@ use std::io::prelude::*;
 use rug::Rational;
 use std::collections::HashMap;
 
+#[derive(Debug)]
+enum ParseError {
+    InvalidOperation,
+    ArgumentError,
+    Other,
+}
+
+#[derive(Clone)]
 enum Item {
     P(Polynomial),
     Qr((Polynomial, Polynomial)),
     Ps(PolySet),
+    Qsr((PolySet, Polynomial)),
     OK,
 }
 
@@ -19,21 +28,21 @@ impl ToString for Item {
             Self::P(p1) => p1.to_string(),
             Self::Qr((q, r)) => format!("q: {}, r: {}", q.to_string(), r.to_string()),
             Self::Ps(ps) => ps.to_string(),
+            Self::Qsr((ps, r)) => format!("qs: {}, r: {}", ps.to_string(), r.to_string()),
             Self::OK => String::new(),
         }
     }
 }
 
-// Currently kinda hacky, need to fully decide on input scheme
-fn get_poly(x: &str, table: &HashMap<String, Item>) -> Polynomial {
+fn get_item(x: &str, table: &HashMap<String, Item>) -> Result<Item, MonomError> {
     match table.get(x) {
-        Some(Item::P(p)) => p.clone(),
-        None => Polynomial::from_string(x),
-        _ => Polynomial { length: 0, terms: vec![] },
+        Some(item) => Ok(item.clone()),
+        None => Ok(Item::P(Polynomial::from_string(x)?)),
     }
 }
 
-fn prep_ps(x: &str, table: &HashMap<String, Item>) -> Vec<Item> {
+
+fn prep_ps(x: &str, table: &HashMap<String, Item>) -> Result<Vec<Item>, ParseError> {
     let s: Vec<&str> = x.split(';').collect();
     if s.len() == 1 {
         x.split(' ')
@@ -50,47 +59,66 @@ fn prep_ps(x: &str, table: &HashMap<String, Item>) -> Vec<Item> {
 
 
 
-fn parse_expression_h(x: &str, table: &HashMap<String, Item>) -> Item {
+fn parse_expression_h(x: &str, table: &HashMap<String, Item>) -> Result<Item, ParseError> {
     if let Some((op, s)) = x.split_once(' ') {
         if op == "+" {
-            let ps: Vec<Item> = prep_ps(s, table);
+            let ps: Vec<Item> = prep_ps(s, table)?;
             match (&ps[0], &ps[1]) {
-                (Item::P(p1), Item::P(p2)) => Item::P(add_polys(&p1, &p2)),
-                _ => panic!("The first two arguments were not polynomials"),
+                (Item::P(p1), Item::P(p2)) => Ok(Item::P(add_polys(&p1, &p2))),
+                _ => Err(ParseError::ArgumentError),
             }
         } else if op == "-" {
-            let ps: Vec<Item> = prep_ps(s, table);
+            let ps: Vec<Item> = prep_ps(s, table)?;
             match (&ps[0], &ps[1]) {
-                (Item::P(p1), Item::P(p2)) => Item::P(sub_polys(&p1, &p2)),
-                _ => panic!("The first two arguments were not polynomials"),
+                (Item::P(p1), Item::P(p2)) => Ok(Item::P(sub_polys(&p1, &p2))),
+                _ => Err(ParseError::ArgumentError),
             }
         } else if op == "*" {
-            let ps: Vec<Item> = prep_ps(s, table);
+            let ps: Vec<Item> = prep_ps(s, table)?;
             match (&ps[0], &ps[1]) {
-                (Item::P(p1), Item::P(p2)) => Item::P(mult_polys(&p1, &p2)),
-                _ => panic!("The first two arguments were not polynomials"),
+                (Item::P(p1), Item::P(p2)) => Ok(Item::P(mult_polys(&p1, &p2))),
+                _ => Err(ParseError::ArgumentError),
             }
         } else if op == "/" {
-            let ps: Vec<Item> = prep_ps(s, table);
+            let ps: Vec<Item> = prep_ps(s, table)?;
             match (&ps[0], &ps[1]) {
-                (Item::P(p1), Item::P(p2)) => Item::Qr(divide_polys(&p1, &p2)),
-                _ => panic!("The first two arguments were not polynomials"),
+                (Item::P(p1), Item::P(p2)) => Ok(Item::Qr(divide_polys(&p1, &p2))),
+                _ => Err(ParseError::ArgumentError),
             }
+        } else if op == "s" {
+            let ps:Result<Vec<Polynomial>, ParseError> = prep_ps(s, table)?
+                .iter()
+                .map(|x| {
+                    match x {
+                        Item::P(p1) => Ok(p1.clone()),
+                        _ => Err(ParseError::ArgumentError),
+                    }
+                })
+                .collect();
+            Ok(Item::Ps(PolySet(ps?)))
+        } else if op == "/s" {
+            let ps: Vec<Item> = prep_ps(s, table)?;
+            match (&ps[0], &ps[1]) {
+                (Item::P(p1), Item::Ps(ps)) => Ok(Item::Qsr(divide_poly_set(&p1, &ps))),
+                _ => Err(ParseError::ArgumentError),
+            }
+        } else {
+            Err(ParseError::InvalidOperation)
         }
-        else {
-            panic!("Operation not recognized");
+    } else {
+        match get_item(x, table) {
+            Ok(item) => Ok(item),
+            Err(_) => Err(ParseError::InvalidOperation),
         }
-    } else 
-        Item::P(get_poly(x, table))
     }
 }
 
-fn parse_expression(x: &str, table: &mut HashMap<String, Item>) -> Item {
+fn parse_expression(x: &str, table: &mut HashMap<String, Item>) -> Result<Item, ParseError> {
     if let Some(("=", s)) = x.split_once(' ') {
         if let Some((name, s)) = s.split_once(' ') {
-            table.insert(name.to_string(), parse_expression_h(s, table));
+            table.insert(name.to_string(), parse_expression_h(s, table)?);
         }
-        Item::OK
+        Ok(Item::OK)
     } else {
         parse_expression_h(x, table)
     }
@@ -108,11 +136,21 @@ fn main() {
         io::stdin().read_line(&mut s).expect("Failed to read line");
         s = s.trim().to_string();
 
-        println!("{}", parse_expression(&s, &mut items).to_string());
-
         if s == "q" || s == "quit" || s == "exit" {
             break;
         }
 
+        let token = match parse_expression(&s, &mut items) {
+            Ok(item) => item.to_string(),
+            Err(err) => match err {
+                ParseError::InvalidOperation => "ParseError: Invalid operation attempted".to_string(),
+                ParseError::ArgumentError => 
+                "Operation was applied with invalid arguments. Most operations take two polynomials."
+                .to_string(),
+                ParseError::Other => panic!("Something went horribly wrong"),
+            }
+        };
+
+        println!("{}", token);
     }
 }

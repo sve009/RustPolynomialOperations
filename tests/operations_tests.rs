@@ -121,11 +121,11 @@ fn monom_mult() {
 
 #[test]
 fn handpicked_mult() {
-    let p1 = Polynomial::from_string("2x^3y^2 + 1x^1y^0 + 3x^0y^3");
-    let p2 = Polynomial::from_string("4x^2y^0 + 1x^0y^2");
+    let p1 = Polynomial::from_string("2x^3y^2 + 1x^1y^0 + 3x^0y^3").unwrap();
+    let p2 = Polynomial::from_string("4x^2y^0 + 1x^0y^2").unwrap();
 
     let p3 = mult_polys(&p1, &p2);
-    let p4 = Polynomial::from_string("8x^5y^2 + 2x^3y^4 + 4x^3y^0 + 12x^2y^3 + 1x^1y^2 + 3x^0y^5");
+    let p4 = Polynomial::from_string("8x^5y^2 + 2x^3y^4 + 4x^3y^0 + 12x^2y^3 + 1x^1y^2 + 3x^0y^5").unwrap();
 
     assert!(p3 == p4);
 }
@@ -157,8 +157,8 @@ fn divides_test() {
     let p4 = Polynomial::from_monom(Monomial { coefficient: Rational::from(1), degree: vec![1, 0] });
     let p5 = Polynomial::from_monom(Monomial { coefficient: Rational::from(1), degree: vec![0, 1] });
 
-    let p6 = Polynomial::from_string("1x^1y^0 + 2x^0y^2");
-    let p7 = Polynomial::from_string("1x^0y^2");
+    let p6 = Polynomial::from_string("1x^1y^0 + 2x^0y^2").unwrap();
+    let p7 = Polynomial::from_string("1x^0y^2").unwrap();
 
     assert!(poly_divides(&p2, &p1));
     assert!(poly_divides(&p4, &p1));
@@ -203,12 +203,12 @@ fn handpicked_poly_divides() {
 
     let r = Polynomial::from_monom(m4);
 
-    assert!(divide_polys(&Polynomial::from_string(p1), &Polynomial::from_string(p2)) == (q, r));
+    assert!(divide_polys(&Polynomial::from_string(p1).unwrap(), &Polynomial::from_string(p2).unwrap()) == (q, r));
 
-    let p1 = Polynomial::from_string("1x^3y^1 + 2x^2y^3 + 3x^1y^1");
-    let p2 = Polynomial::from_string("1x^1y^1");
+    let p1 = Polynomial::from_string("1x^3y^1 + 2x^2y^3 + 3x^1y^1").unwrap();
+    let p2 = Polynomial::from_string("1x^1y^1").unwrap();
 
-    let q = Polynomial::from_string("1x^2y^0 + 2x^1y^2 + 3x^0y^0");
+    let q = Polynomial::from_string("1x^2y^0 + 2x^1y^2 + 3x^0y^0").unwrap();
     let r = Polynomial { length: 0, terms: Vec::new() };
 
     let (q1, r1) = divide_polys(&p1, &p2);
@@ -216,13 +216,13 @@ fn handpicked_poly_divides() {
     assert!(q == q1);
     assert!(r == r1);
 
-    let p6 = Polynomial::from_string("1x^1y^0 + 2x^0y^2");
-    let p7 = Polynomial::from_string("1x^0y^2");
+    let p6 = Polynomial::from_string("1x^1y^0 + 2x^0y^2").unwrap();
+    let p7 = Polynomial::from_string("1x^0y^2").unwrap();
 
     let (q, r) = divide_polys(&p6, &p7);
 
-    let q1 = Polynomial::from_string("2x^0y^0");
-    let r1 = Polynomial::from_string("1x^1y^0");
+    let q1 = Polynomial::from_string("2x^0y^0").unwrap();
+    let r1 = Polynomial::from_string("1x^1y^0").unwrap();
 
     assert!(q == q1);
     assert!(r == r1);
@@ -230,26 +230,26 @@ fn handpicked_poly_divides() {
 
 #[test]
 pub fn handpicked_div_poly_set() {
-    let p1 = Polynomial::from_string("1x^2y^0 + 1x^0y^2 + 1x^0y^0");
-    let p2 = Polynomial::from_string("1x^2y^0");
-    let p3 = Polynomial::from_string("1x^0y^2");
+    let p1 = Polynomial::from_string("1x^2y^0 + 1x^0y^2 + 1x^0y^0").unwrap();
+    let p2 = Polynomial::from_string("1x^2y^0").unwrap();
+    let p3 = Polynomial::from_string("1x^0y^2").unwrap();
 
-    let q = Polynomial::from_string("1x^0y^0");
+    let q = Polynomial::from_string("1x^0y^0").unwrap();
 
     let (qs, r) = divide_poly_set(&p1, &PolySet(vec![p2, p3]));
 
     assert!(r == q);
     assert!(qs == PolySet(vec![q.clone(), q]));
 
-    let p1 = Polynomial::from_string("5x^1y^3 + 3x^1y^2 + 2x^0y^1");
-    let p2 = Polynomial::from_string("1x^0y^2 + 2x^0y^0");
-    let p3 = Polynomial::from_string("1x^1y^0 + 4x^0y^0");
+    let p1 = Polynomial::from_string("5x^1y^3 + 3x^1y^2 + 2x^0y^1").unwrap();
+    let p2 = Polynomial::from_string("1x^0y^2 + 2x^0y^0").unwrap();
+    let p3 = Polynomial::from_string("1x^1y^0 + 4x^0y^0").unwrap();
 
     let (qs, r) = divide_poly_set(&p1, &PolySet(vec![p2, p3]));
 
-    let p4 = Polynomial::from_string("5x^1y^1 + 3x^1y^0");
-    let p5 = Polynomial::from_string("-10x^0y^1 + -6x^0y^0");
-    let p6 = Polynomial::from_string("42x^0y^1 + 24x^0y^0");
+    let p4 = Polynomial::from_string("5x^1y^1 + 3x^1y^0").unwrap();
+    let p5 = Polynomial::from_string("-10x^0y^1 + -6x^0y^0").unwrap();
+    let p6 = Polynomial::from_string("42x^0y^1 + 24x^0y^0").unwrap();
 
     assert!(qs == PolySet(vec![p4, p5]));
     assert!(r == p6);

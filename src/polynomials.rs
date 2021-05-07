@@ -6,6 +6,12 @@ use rug::Rational;
 #[derive(PartialEq)]
 pub struct PolySet(pub Vec<Polynomial>);
 
+impl Clone for PolySet {
+    fn clone(&self) -> Self {
+        PolySet(self.0.clone())
+    }
+}
+
 impl ToString for PolySet {
     fn to_string(&self) -> String {
         let mut s = String::new();
@@ -24,6 +30,11 @@ impl ToString for PolySet {
     }
 }
 
+#[derive(Debug)]
+pub enum MonomError {
+    InvalidCoefficient,
+    NoAlphaSymbol,
+}
 
 #[derive(Eq)]
 pub struct Monomial {
@@ -35,9 +46,17 @@ impl Monomial {
     pub fn get_degree(&self) -> &Vec<u16> {
         &self.degree
     }
-    pub fn from_string(s: &str) -> Monomial {
-        let (h, mut t) = s.split_at(s.find(|c: char| c.is_alphabetic()).unwrap());
-        let c = h.parse::<i64>().unwrap();
+    pub fn from_string(s: &str) -> Result<Monomial, MonomError> {
+        let (h, mut t) = s.split_at(
+            match s.find(|c: char| c.is_alphabetic()) {
+                Some(i) => i,
+                None => return Err(MonomError::NoAlphaSymbol),
+            });
+
+        let c: Rational = match h.parse() {
+            Ok(r) => r,
+            Err(_) => return Err(MonomError::InvalidCoefficient),
+        };
 
         let mut v = Vec::new();
 
@@ -54,7 +73,7 @@ impl Monomial {
                 }
             };
         }
-        Monomial { coefficient: Rational::from(c), degree: v }
+        Ok(Monomial { coefficient: c, degree: v })
     }
 }
 
@@ -134,11 +153,12 @@ impl Polynomial {
     pub fn get_terms(&self) -> &Vec<Monomial> {
         &self.terms
     }
-    pub fn from_string(s: &str) -> Self {
-        let terms: Vec<Monomial> = s.split("+")
+    pub fn from_string(s: &str) -> Result<Self, MonomError> {
+        let terms: Result<Vec<Monomial>, MonomError> = s.split("+")
             .map(|s| s.trim())
             .map(|s| Monomial::from_string(s)).collect();
-        Polynomial { length: terms.len(), terms: terms }
+        let t = terms?;
+        Ok(Polynomial { length: t.len(), terms: t})
     }
     pub fn from_monom(m: Monomial) -> Self {
         Polynomial {
