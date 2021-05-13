@@ -3,6 +3,12 @@ extern crate rug;
 use std::cmp::Ordering;
 use rug::Rational;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MonomialOrdering {
+    Lex,
+    DegLex,
+}
+
 #[derive(PartialEq)]
 pub struct PolySet(pub Vec<Polynomial>);
 
@@ -44,6 +50,7 @@ pub enum MonomError {
 pub struct Monomial {
     pub coefficient: rug::Rational,
     pub degree: Vec<u16>,
+    pub order: MonomialOrdering,
 }
 
 impl Monomial {
@@ -57,9 +64,13 @@ impl Monomial {
                 None => return Err(MonomError::NoAlphaSymbol),
             });
 
-        let c: Rational = match h.parse() {
-            Ok(r) => r,
-            Err(_) => return Err(MonomError::InvalidCoefficient),
+        let c: Rational = if h.is_empty() {
+            Rational::from(1)
+        } else {
+            match h.parse() {
+                Ok(r) => r,
+                Err(_) => return Err(MonomError::InvalidCoefficient),
+            }
         };
 
         let mut v = Vec::new();
@@ -77,7 +88,7 @@ impl Monomial {
                 }
             };
         }
-        Ok(Monomial { coefficient: c, degree: v })
+        Ok(Monomial { coefficient: c, degree: v, order: MonomialOrdering::DegLex })
     }
 }
 
@@ -86,16 +97,40 @@ impl Ord for Monomial {
         let d1 = &self.degree;
         let d2 = &other.degree;
 
-        for (a, b) in d1.iter().zip(d2) {
-            if a < b {
-                return Ordering::Less;
-            } else if a > b {
-                return Ordering::Greater;
-            } else {
-                continue;
+        match self.order {
+            MonomialOrdering::Lex => {
+                for (a, b) in d1.iter().zip(d2) {
+                    if a < b {
+                        return Ordering::Less;
+                    } else if a > b {
+                        return Ordering::Greater;
+                    } else {
+                        continue;
+                    }
+                }
+                Ordering::Equal
+            },
+            MonomialOrdering::DegLex => {
+                let a1: u16 = d1.iter().sum();
+                let a2: u16 = d2.iter().sum();
+                if a1 < a2 {
+                    Ordering::Less
+                } else if a1 > a2 {
+                    Ordering::Greater
+                } else {
+                    for (a, b) in d1.iter().zip(d2) {
+                        if a < b {
+                            return Ordering::Less;
+                        } else if a > b {
+                            return Ordering::Greater;
+                        } else {
+                            continue;
+                        }
+                    }
+                    Ordering::Equal
+                }
             }
         }
-        Ordering::Equal
     }
 }
 
@@ -104,16 +139,40 @@ impl PartialOrd for Monomial {
         let d1 = &self.degree;
         let d2 = &other.degree;
 
-        for (a, b) in d1.iter().zip(d2) {
-            if a < b {
-                return Some(Ordering::Less);
-            } else if a > b {
-                return Some(Ordering::Greater);
-            } else {
-                continue;
+        match self.order {
+            MonomialOrdering::Lex => {
+                for (a, b) in d1.iter().zip(d2) {
+                    if a < b {
+                        return Some(Ordering::Less);
+                    } else if a > b {
+                        return Some(Ordering::Greater);
+                    } else {
+                        continue;
+                    }
+                }
+                return Some(Ordering::Equal)
+            },
+            MonomialOrdering::DegLex => {
+                let a1: u16 = d1.iter().sum();
+                let a2: u16 = d2.iter().sum();
+                if a1 < a2 {
+                    return Some(Ordering::Less)
+                } else if a1 > a2 {
+                    return Some(Ordering::Greater)
+                } else {
+                    for (a, b) in d1.iter().zip(d2) {
+                        if a < b {
+                            return Some(Ordering::Less);
+                        } else if a > b {
+                            return Some(Ordering::Greater);
+                        } else {
+                            continue;
+                        }
+                    }
+                    return Some(Ordering::Equal);
+                }
             }
         }
-        Some(Ordering::Equal)
     }
 }
 
@@ -131,6 +190,7 @@ impl Clone for Monomial {
         Monomial {
             coefficient: self.coefficient.clone(),
             degree: self.degree.clone(),
+            order: self.order,
         }
     }
 }
@@ -141,14 +201,16 @@ impl ToString for Monomial {
 
         s += &self.coefficient.to_string();
         for i in 0..self.degree.len() {
-            s += &format!("({}{}){}{} ", "x", (i+1).to_string(), "^", self.degree[i].to_string());
+            if self.degree[i] != 0 {
+                s += &format!("({}{}){}{} ", "x", (i+1).to_string(), "^", self.degree[i].to_string());
+            }
         }
 
         s
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 pub struct Polynomial {
     pub length: usize,
     pub terms: Vec<Monomial>,
@@ -170,6 +232,48 @@ impl Polynomial {
             length: 1,
             terms: vec![m],
         }
+    }
+    pub fn lt(&self) -> Self {
+        Polynomial::from_monom(self.terms[0].clone())
+    }
+    pub fn lm(&self) -> Monomial {
+        Monomial {
+            coefficient: Rational::from(1),
+            degree: self.terms[0].degree.clone(),
+            order: self.terms[0].order,
+        }
+    }
+}
+
+impl Ord for Polynomial {
+    fn cmp(&self, other: &Self) -> Ordering {
+        for i in 0..self.terms.len() {
+            if i >= other.terms.len() {
+                return Ordering::Greater;
+            } else {
+                match self.terms[i].cmp(&other.terms[i]) {
+                    Ordering::Equal => continue,
+                    x => return x,
+                }
+            }
+        }
+        Ordering::Less
+    }
+}
+
+impl PartialOrd for Polynomial {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        for i in 0..self.terms.len() {
+            if i >= other.terms.len() {
+                return Some(Ordering::Greater);
+            } else {
+                match self.terms[i].cmp(&other.terms[i]) {
+                    Ordering::Equal => continue,
+                    x => return Some(x),
+                }
+            }
+        }
+        Some(Ordering::Less)
     }
 }
 

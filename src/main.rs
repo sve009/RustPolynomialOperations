@@ -3,7 +3,6 @@ use polynomial_operations::operations::*;
 
 use std::io;
 use std::io::prelude::*;
-use rug::Rational;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -63,24 +62,36 @@ fn parse_expression_h(x: &str, table: &HashMap<String, Item>) -> Result<Item, Pa
     if let Some((op, s)) = x.split_once(' ') {
         if op == "+" {
             let ps: Vec<Item> = prep_ps(s, table)?;
+            if ps.len() < 2 {
+                return Err(ParseError::ArgumentError);
+            }
             match (&ps[0], &ps[1]) {
                 (Item::P(p1), Item::P(p2)) => Ok(Item::P(add_polys(&p1, &p2))),
                 _ => Err(ParseError::ArgumentError),
             }
         } else if op == "-" {
             let ps: Vec<Item> = prep_ps(s, table)?;
+            if ps.len() < 2 {
+                return Err(ParseError::ArgumentError);
+            }
             match (&ps[0], &ps[1]) {
                 (Item::P(p1), Item::P(p2)) => Ok(Item::P(sub_polys(&p1, &p2))),
                 _ => Err(ParseError::ArgumentError),
             }
         } else if op == "*" {
             let ps: Vec<Item> = prep_ps(s, table)?;
+            if ps.len() < 2 {
+                return Err(ParseError::ArgumentError);
+            }
             match (&ps[0], &ps[1]) {
                 (Item::P(p1), Item::P(p2)) => Ok(Item::P(mult_polys(&p1, &p2))),
                 _ => Err(ParseError::ArgumentError),
             }
         } else if op == "/" {
             let ps: Vec<Item> = prep_ps(s, table)?;
+            if ps.len() < 2 {
+                return Err(ParseError::ArgumentError);
+            }
             match (&ps[0], &ps[1]) {
                 (Item::P(p1), Item::P(p2)) => Ok(Item::Qr(divide_polys(&p1, &p2))),
                 _ => Err(ParseError::ArgumentError),
@@ -98,12 +109,18 @@ fn parse_expression_h(x: &str, table: &HashMap<String, Item>) -> Result<Item, Pa
             Ok(Item::Ps(PolySet(ps?)))
         } else if op == "/s" {
             let ps: Vec<Item> = prep_ps(s, table)?;
+            if ps.len() < 2 {
+                return Err(ParseError::ArgumentError);
+            }
             match (&ps[0], &ps[1]) {
-                (Item::P(p1), Item::Ps(ps)) => Ok(Item::Qsr(divide_poly_set(&p1, &ps))),
+                (Item::P(p1), Item::Ps(polys)) => Ok(Item::Qsr(divide_poly_set(&p1, &mut polys.clone()))),
                 _ => Err(ParseError::ArgumentError),
             }
         } else if op == "base" {
             let ps: Vec<Item> = prep_ps(s, table)?;
+            if ps.len() < 1 {
+                return Err(ParseError::ArgumentError);
+            }
             match &ps[0] {
                 Item::Ps(ps) => Ok(Item::Ps(grobner_basis(&ps))),
                 _ => Err(ParseError::ArgumentError),
