@@ -3,6 +3,7 @@ extern crate rug;
 use super::polynomials::*;
 
 use std::collections::BinaryHeap;
+use std::rc::Rc;
 use rug::Rational;
 
 pub fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
@@ -18,13 +19,13 @@ pub fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
 fn combine_terms(v: &mut Vec<Monomial>) {
     let mut v0 = Vec::new();
 
-    let order = v[0].order;
+    let ring = Rc::clone(&v[0].ring);
 
     let mut n = 0;
     while n < v.len() - 1 {
         if deg_eq(&v[n].degree, &v[n + 1].degree) {
             if Rational::from(&v[n].coefficient + &v[n + 1].coefficient) != 0 {
-                v0.push(Monomial { coefficient: v[n].coefficient.clone() + v[n + 1].coefficient.clone(), degree: v[n].get_degree().to_vec(), order});
+                v0.push(Monomial { coefficient: v[n].coefficient.clone() + v[n + 1].coefficient.clone(), degree: v[n].get_degree().to_vec(), ring: Rc::clone(&ring) });
             }
             n += 2;
         } else if v[n].coefficient != 0 {
@@ -78,6 +79,7 @@ pub fn add_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     Polynomial {
         length: v.len(),
         terms: v,
+        ring: Rc::clone(&f.ring),
     }
 }
 
@@ -87,11 +89,12 @@ pub fn sub_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
 
 pub fn scalar_mult(f: &Polynomial, n: Rational) -> Polynomial {
     let terms: Vec<Monomial> = f.terms.iter()
-        .map(|m| Monomial { coefficient: m.coefficient.clone() * &n, degree: m.degree.clone(), order: m.order })
+        .map(|m| Monomial { coefficient: m.coefficient.clone() * &n, degree: m.degree.clone(), ring: Rc::clone(&m.ring) })
         .collect();
     Polynomial {
         length: terms.len(),
         terms,
+        ring: Rc::clone(&f.ring),
     }
 }
 
@@ -99,7 +102,7 @@ pub fn mult_monoms(f : &Monomial, g: &Monomial) -> Monomial {
     Monomial {
         coefficient: f.coefficient.clone() * g.coefficient.clone(),
         degree: f.degree.iter().zip(&g.degree).map(|(x, y)| x + y).collect(),
-        order: f.order,
+        ring: Rc::clone(&f.ring),
     }
 }
 
@@ -110,6 +113,7 @@ pub fn mult_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     let mut c = Polynomial {
         length: 0,
         terms: Vec::new(),
+        ring: Rc::clone(&f.ring),
     };
 
     let mut h = BinaryHeap::new();
@@ -120,7 +124,7 @@ pub fn mult_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     }
 
     while let Some((d, s)) = h.pop() {
-        let p = Polynomial { length: 1, terms: vec![d] };
+        let p = Polynomial { length: 1, terms: vec![d], ring: Rc::clone(&f.ring) };
 
         c = add_polys(&c, &p);
 
@@ -162,14 +166,14 @@ pub fn divide_monoms(f: &Monomial, g: &Monomial) -> Monomial {
     Monomial { 
         coefficient: (f.coefficient.clone() / g. coefficient.clone()),
         degree: f.degree.iter().zip(&g.degree).map(|(x, y)| x - y).collect(),
-        order: f.order,
+        ring: Rc::clone(&f.ring),
     }
 }
 
 
 pub fn divide_polys(f: &Polynomial, g: &Polynomial) -> (Polynomial, Polynomial) {
-    let mut q = Polynomial { length: 0, terms: Vec::new() };
-    let mut r = Polynomial { length: 0, terms: Vec::new() };
+    let mut q = Polynomial { length: 0, terms: Vec::new(), ring: Rc::clone(&f.ring) };
+    let mut r = Polynomial { length: 0, terms: Vec::new(), ring: Rc::clone(&f.ring) };
 
     let mut rp;
 
@@ -207,12 +211,12 @@ pub fn divide_poly_set(f: &Polynomial, g: &mut PolySet) -> (PolySet, Polynomial)
     // g.0.sort_unstable();
 
     let mut qs: PolySet = PolySet(Vec::new());
-    let mut r = Polynomial { length: 0, terms: vec![] };
+    let mut r = Polynomial { length: 0, terms: vec![], ring: Rc::clone(&f.ring) };
 
     let mut p = f.clone();
 
     for _ in 0..g.0.len() {
-        qs.0.push(Polynomial { length: 0, terms: vec![] });
+        qs.0.push(Polynomial { length: 0, terms: vec![], ring: Rc::clone(&f.ring) });
     }
 
     while !p.terms.is_empty() { 
@@ -253,7 +257,7 @@ pub fn gcd(f: &Monomial, g: &Monomial) -> Monomial {
         })
         .collect();
 
-    Monomial { coefficient: Rational::from(1), degree, order: f.order }
+    Monomial { coefficient: Rational::from(1), degree, ring: Rc::clone(&f.ring) }
 }
 
 pub fn lcm(f: &Monomial, g: &Monomial) -> Monomial {
@@ -280,7 +284,7 @@ pub fn s_poly(f: &Polynomial, g: &Polynomial) -> Polynomial {
             }
         }).collect();
 
-    let m = Monomial { coefficient: Rational::from(1), degree: deg, order: MonomialOrdering::DegLex };
+    let m = Monomial { coefficient: Rational::from(1), degree: deg, ring: Rc::clone(&f.ring) };
 
     let p1 = Polynomial::from_monom(divide_monoms(&m, m1));
     let p2 = Polynomial::from_monom(divide_monoms(&m, m2));

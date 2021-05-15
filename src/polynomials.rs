@@ -1,7 +1,14 @@
 extern crate rug;
 
 use std::cmp::Ordering;
+use std::rc::Rc;
 use rug::Rational;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Ring {
+    pub symbols: Vec<String>,
+    pub ord: MonomialOrdering,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MonomialOrdering {
@@ -50,18 +57,31 @@ pub enum MonomError {
 pub struct Monomial {
     pub coefficient: rug::Rational,
     pub degree: Vec<u16>,
-    pub order: MonomialOrdering,
+    pub ring: Rc<Ring>,
+}
+
+fn find(v: &Vec<String>, s: &str) -> Option<usize> {
+    for i in 0..v.len() {
+        if &v[i] == s {
+            return Some(i);
+        }
+    }
+    println!("Couldn't find symbol in ring");
+    None
 }
 
 impl Monomial {
     pub fn get_degree(&self) -> &Vec<u16> {
         &self.degree
     }
-    pub fn from_string(s: &str) -> Result<Monomial, MonomError> {
+    pub fn from_string(s: &str, ring: Rc<Ring>) -> Result<Monomial, MonomError> {
         let (h, mut t) = s.split_at(
             match s.find(|c: char| c.is_alphabetic()) {
                 Some(i) => i,
-                None => return Err(MonomError::NoAlphaSymbol),
+                None => {
+                    println!("No alphabetic symbol present");
+                    return Err(MonomError::NoAlphaSymbol)
+                },
             });
 
         let c: Rational = if h.is_empty() {
@@ -69,26 +89,37 @@ impl Monomial {
         } else {
             match h.parse() {
                 Ok(r) => r,
-                Err(_) => return Err(MonomError::InvalidCoefficient),
+                Err(_) => {
+                    println!("Coefficient invalid");
+                    return Err(MonomError::InvalidCoefficient)
+                },
             }
         };
 
-        let mut v = Vec::new();
+        let mut v = vec![0; ring.symbols.len()];
 
         while let Some(i) = t.find('^') {
-            t = t.split_at(i + 1).1;
+            let res = t.split_at(i + 1);
+            let temp = res.0;
+            t = res.1;
+            let symb = temp.split_at(temp.len() - 1).0;
+            let k = match find(&ring.symbols, symb) {
+                Some(a) => a,
+                None => return Err(MonomError::InvalidCoefficient),
+            };
             t = match t.find(|c: char| c.is_alphabetic()) {
                 Some(j) => {
-                    v.push(t.split_at(j).0.parse::<u16>().unwrap());
+                    let n = t.split_at(j).0.parse::<u16>().unwrap();
+                    v[k] = n;
                     t.split_at(j).1
                 }
                 None => {
-                    v.push(t.parse::<u16>().unwrap());
+                    v[k] = t.parse::<u16>().unwrap();
                     ""
                 }
             };
         }
-        Ok(Monomial { coefficient: c, degree: v, order: MonomialOrdering::DegLex })
+        Ok(Monomial { coefficient: c, degree: v, ring })
     }
 }
 
@@ -97,7 +128,7 @@ impl Ord for Monomial {
         let d1 = &self.degree;
         let d2 = &other.degree;
 
-        match self.order {
+        match self.ring.ord {
             MonomialOrdering::Lex => {
                 for (a, b) in d1.iter().zip(d2) {
                     if a < b {
@@ -139,7 +170,7 @@ impl PartialOrd for Monomial {
         let d1 = &self.degree;
         let d2 = &other.degree;
 
-        match self.order {
+        match self.ring.ord {
             MonomialOrdering::Lex => {
                 for (a, b) in d1.iter().zip(d2) {
                     if a < b {
@@ -190,7 +221,7 @@ impl Clone for Monomial {
         Monomial {
             coefficient: self.coefficient.clone(),
             degree: self.degree.clone(),
-            order: self.order,
+            ring: Rc::clone(&self.ring),
         }
     }
 }
@@ -202,7 +233,7 @@ impl ToString for Monomial {
         s += &self.coefficient.to_string();
         for i in 0..self.degree.len() {
             if self.degree[i] != 0 {
-                s += &format!("({}{}){}{} ", "x", (i+1).to_string(), "^", self.degree[i].to_string());
+                s += &format!("{}{}{} ", self.ring.symbols[i], "^", self.degree[i].to_string());
             }
         }
 
@@ -214,23 +245,26 @@ impl ToString for Monomial {
 pub struct Polynomial {
     pub length: usize,
     pub terms: Vec<Monomial>,
+    pub ring: Rc<Ring>,
 }
 
 impl Polynomial {
     pub fn get_terms(&self) -> &Vec<Monomial> {
         &self.terms
     }
-    pub fn from_string(s: &str) -> Result<Self, MonomError> {
+    pub fn from_string(s: &str, ring: &Rc<Ring>) -> Result<Self, MonomError> {
         let terms: Result<Vec<Monomial>, MonomError> = s.split('+')
             .map(|s| s.trim())
-            .map(|s| Monomial::from_string(s)).collect();
+            .map(|s| Monomial::from_string(s, Rc::clone(ring))).collect();
         let t = terms?;
-        Ok(Polynomial { length: t.len(), terms: t})
+        Ok(Polynomial { length: t.len(), terms: t, ring: Rc::clone(ring) })
     }
     pub fn from_monom(m: Monomial) -> Self {
+        let ring = Rc::clone(&m.ring);
         Polynomial {
             length: 1,
             terms: vec![m],
+            ring,
         }
     }
     pub fn lt(&self) -> Self {
@@ -240,7 +274,7 @@ impl Polynomial {
         Monomial {
             coefficient: Rational::from(1),
             degree: self.terms[0].degree.clone(),
-            order: self.terms[0].order,
+            ring: Rc::clone(&self.ring),
         }
     }
 }
@@ -295,6 +329,7 @@ impl Clone for Polynomial {
         Polynomial {
             length: self.length,
             terms: self.terms.clone(),
+            ring: Rc::clone(&self.ring),
         }
     }
 }
