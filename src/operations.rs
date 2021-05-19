@@ -6,6 +6,8 @@ use std::collections::BinaryHeap;
 use std::rc::Rc;
 use rug::Rational;
 
+// Implementation details for polynomial operatins
+
 pub fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
     for i in 0..d1.len() {
         if d1[i] != d2[i] {

@@ -4,6 +4,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 use rug::Rational;
 
+// Polynomial representations and supporting functions. 
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Ring {
     pub symbols: Vec<String>,
@@ -66,7 +68,6 @@ fn find(v: &Vec<String>, s: &str) -> Option<usize> {
             return Some(i);
         }
     }
-    println!("Couldn't find symbol in ring");
     None
 }
 
@@ -79,7 +80,6 @@ impl Monomial {
             match s.find(|c: char| c.is_alphabetic()) {
                 Some(i) => i,
                 None => {
-                    println!("No alphabetic symbol present");
                     return Err(MonomError::NoAlphaSymbol)
                 },
             });
@@ -90,7 +90,6 @@ impl Monomial {
             match h.parse() {
                 Ok(r) => r,
                 Err(_) => {
-                    println!("Coefficient invalid");
                     return Err(MonomError::InvalidCoefficient)
                 },
             }
@@ -233,7 +232,7 @@ impl ToString for Monomial {
         s += &self.coefficient.to_string();
         for i in 0..self.degree.len() {
             if self.degree[i] != 0 {
-                s += &format!("{}{}{} ", self.ring.symbols[i], "^", self.degree[i].to_string());
+                s += &format!("{}{}{}", self.ring.symbols[i], "^", self.degree[i].to_string());
             }
         }
 
