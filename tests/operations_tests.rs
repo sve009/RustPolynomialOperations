@@ -128,7 +128,7 @@ fn monom_mult() {
 
 #[test]
 fn handpicked_mult() {
-    let ring = Rc::new(Ring { symbols: vec![], ord: MonomialOrdering::DegLex });
+    let ring = Rc::new(Ring { symbols: vec!["x".to_string(), "y".to_string()], ord: MonomialOrdering::DegLex });
     let p1 = Polynomial::from_string("2x^3y^2 + 1x^1y^0 + 3x^0y^3", &ring).unwrap();
     let p2 = Polynomial::from_string("4x^2y^0 + 1x^0y^2", &ring).unwrap();
 
@@ -162,7 +162,7 @@ fn monom_divide() {
 
 #[test]
 fn divides_test() {
-    let ring = Rc::new(Ring { symbols: vec![], ord: MonomialOrdering::DegLex });
+    let ring = Rc::new(Ring { symbols: vec!["x".to_string(), "y".to_string()], ord: MonomialOrdering::DegLex });
 
     let p1 = Polynomial::from_monom(Monomial { coefficient: Rational::from(4), degree: vec![3, 1], ring: Rc::clone(&ring) });
     let p2 = Polynomial::from_monom(Monomial { coefficient: Rational::from(2), degree: vec![1, 1], ring: Rc::clone(&ring) });
@@ -186,7 +186,7 @@ fn divides_test() {
 
 #[test]
 fn handpicked_poly_divides() {
-    let ring = Rc::new(Ring { symbols: vec![], ord: MonomialOrdering::DegLex });
+    let ring = Rc::new(Ring { symbols: vec!["x".to_string(), "y".to_string()], ord: MonomialOrdering::DegLex });
 
     let p1 = "2x^3 + 5x^1 + 3x^0";
     let p2 = "3x^1 + 2x^0";
@@ -250,7 +250,7 @@ fn handpicked_poly_divides() {
 
 #[test]
 pub fn handpicked_div_poly_set() {
-    let ring = Rc::new(Ring { symbols: vec![], ord: MonomialOrdering::DegLex });
+    let ring = Rc::new(Ring { symbols: vec!["x".to_string(), "y".to_string()], ord: MonomialOrdering::DegLex });
 
     let p1 = Polynomial::from_string("1x^2y^0 + 1x^0y^2 + 1x^0y^0", &ring).unwrap();
     let p2 = Polynomial::from_string("1x^2y^0", &ring).unwrap();
