@@ -8,7 +8,8 @@ use rug::Rational;
 
 // Implementation details for polynomial operatins
 
-pub fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
+// Simply checks if degree vectors are equal
+fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
     for i in 0..d1.len() {
         if d1[i] != d2[i] {
             return false;
@@ -18,6 +19,11 @@ pub fn deg_eq(d1: &[u16], d2: &[u16]) -> bool {
 }
 
 
+// Runs through adjacent monomials and adds them
+//   together if their degree vectors are identical.
+//
+//   If the resulting monomial has a coefficient of
+//   0, remove it from the final polynomial.
 fn combine_terms(v: &mut Vec<Monomial>) {
     let mut v0 = Vec::new();
 
@@ -48,6 +54,11 @@ fn combine_terms(v: &mut Vec<Monomial>) {
     *v = v0;
 }
 
+// Adds two polynomials together. Uses the merge algorithm from
+//   merge sort in order to maintain the orderings.
+//
+//   @pre The polynomials are ordered correctly according to
+//     their ring's monomial ordering.
 pub fn add_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     let t1 = f.get_terms();
     let t2 = g.get_terms();
@@ -85,10 +96,14 @@ pub fn add_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     }
 }
 
+// Subtracts two polynomials using addition and scalar multiplication
+//   behind the scenes.
 pub fn sub_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     add_polys(f, &scalar_mult(g, Rational::from(-1)))
 }
 
+// Multiplies each monomial coefficent in the polynomial by a
+//   given scalar.
 pub fn scalar_mult(f: &Polynomial, n: Rational) -> Polynomial {
     let terms: Vec<Monomial> = f.terms.iter()
         .map(|m| Monomial { coefficient: m.coefficient.clone() * &n, degree: m.degree.clone(), ring: Rc::clone(&m.ring) })
@@ -100,6 +115,7 @@ pub fn scalar_mult(f: &Polynomial, n: Rational) -> Polynomial {
     }
 }
 
+// Helper function for multiplying monomials together.
 pub fn mult_monoms(f : &Monomial, g: &Monomial) -> Monomial {
     Monomial {
         coefficient: f.coefficient.clone() * g.coefficient.clone(),
@@ -108,6 +124,14 @@ pub fn mult_monoms(f : &Monomial, g: &Monomial) -> Monomial {
     }
 }
 
+// Multiplies two polynomials together. Very similar to the addition algorithm,
+//   but rather than merging two streams, it creates a new list to merge from
+//   from each term in the first polynomial.
+//
+//   These lists are then merged using a priority queue, which here is a binary
+//   heap.
+//
+//   @pre Polynomials are ordered correctly according to the monomial ordering.
 pub fn mult_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     let t1 = &f.terms;
     let t2 = &g.terms;
@@ -139,6 +163,7 @@ pub fn mult_polys(f: &Polynomial, g: &Polynomial) -> Polynomial {
     c
 }
 
+// Helper function to check if one monomial can divide another.
 pub fn monom_divides(f: &Monomial, g: &Monomial) -> bool {
     let d1 = &f.degree;
     let d2 = &g.degree;
@@ -149,6 +174,7 @@ pub fn monom_divides(f: &Monomial, g: &Monomial) -> bool {
         .all(|x| x)
 }
 
+// Helper function to determine if one polynomial can divide another.
 pub fn poly_divides(f: &Polynomial, g: &Polynomial) -> bool {
     if f.terms.is_empty() {
         return false;
@@ -164,6 +190,7 @@ pub fn poly_divides(f: &Polynomial, g: &Polynomial) -> bool {
 
 }
 
+// Helper function to divide monomials. 
 pub fn divide_monoms(f: &Monomial, g: &Monomial) -> Monomial {
     Monomial { 
         coefficient: (f.coefficient.clone() / g. coefficient.clone()),
@@ -173,6 +200,12 @@ pub fn divide_monoms(f: &Monomial, g: &Monomial) -> Monomial {
 }
 
 
+// Divides two polynomials, returning the quotient and the remainder. 
+//   Uses a fairly standard method, where the difference between f
+//   and qg + r is calculated, and then this difference is divided by
+//   g if possible.
+//
+//   @pre All polynomials are ordered according to the monomial ordering.
 pub fn divide_polys(f: &Polynomial, g: &Polynomial) -> (Polynomial, Polynomial) {
     let mut q = Polynomial { length: 0, terms: Vec::new(), ring: Rc::clone(&f.ring) };
     let mut r = Polynomial { length: 0, terms: Vec::new(), ring: Rc::clone(&f.ring) };
@@ -201,13 +234,12 @@ pub fn divide_polys(f: &Polynomial, g: &Polynomial) -> (Polynomial, Polynomial) 
     (q, r)
 }
 
-fn check_divides(r: &Polynomial, gs: &Vec<Polynomial>) -> bool {
-    gs.iter()
-        .map(|p| poly_divides(p, r))
-        .any(|x| x)
-}
-
-
+// Divides a polynomial by a set of polynomials. Uses the algorithm presented in the
+//   textbook, where the lead term is canceled each time if possible. Pretty basic
+//   method where if the first polynomial doesn't divide the lead term, then the
+//   second is tried and so on.
+//
+//   @pre All polynomials are ordered according to the monoomial ordering.
 pub fn divide_poly_set(f: &Polynomial, g: &mut PolySet) -> (PolySet, Polynomial) {
     // Don't know if this is actually more efficient?
     // g.0.sort_unstable();
@@ -243,6 +275,7 @@ pub fn divide_poly_set(f: &Polynomial, g: &mut PolySet) -> (PolySet, Polynomial)
     (qs, r)
 }
 
+// Helper function for optimizing finding the Groebner basis.
 pub fn gcd(f: &Monomial, g: &Monomial) -> Monomial {
     if f.degree.len() != g.degree.len() {
         panic!("Degrees are unequal");
@@ -262,10 +295,12 @@ pub fn gcd(f: &Monomial, g: &Monomial) -> Monomial {
     Monomial { coefficient: Rational::from(1), degree, ring: Rc::clone(&f.ring) }
 }
 
+// Helper function for optimizing finding the Groebner basis.
 pub fn lcm(f: &Monomial, g: &Monomial) -> Monomial {
     divide_monoms(&mult_monoms(f, g), &gcd(f, g))
 }
 
+// Helper function for optimizing finding the Groebner basis.
 pub fn s_poly(f: &Polynomial, g: &Polynomial) -> Polynomial {
     if f.terms.is_empty() {
         return scalar_mult(g, Rational::from(-1));
@@ -294,6 +329,14 @@ pub fn s_poly(f: &Polynomial, g: &Polynomial) -> Polynomial {
     sub_polys(&mult_polys(&p1, f), &mult_polys(&p2, g))
 }
 
+// Calculates the Grobner basis for the ideal generated by the
+//   given set of polynomials.
+//
+// Uses Buchberger's algorithm, with some optimizations that
+//   were suggested in the textbook.
+//
+// @pre All polynomials are ordered according to the monomial
+//   ordering.
 pub fn grobner_basis(ps: &PolySet) -> PolySet {
     let mut s = ps.0.clone();
 
@@ -317,6 +360,8 @@ pub fn grobner_basis(ps: &PolySet) -> PolySet {
     reduce(g)
 }
 
+// Reduces a Grobner basis using the method presented within
+//   the textbook.
 pub fn reduce(mut g: PolySet) -> PolySet {
     let mut gp = Vec::new();
 

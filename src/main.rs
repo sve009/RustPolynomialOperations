@@ -12,7 +12,6 @@ enum ParseError {
     ArgumentError,
     SyntaxError,
     RingError,
-    Other,
 }
 
 #[derive(Clone)]
@@ -211,7 +210,6 @@ fn main() {
                 .to_string(),
                 ParseError::RingError => "RingError: A ring must be provided".to_string(),
                 ParseError::SyntaxError => "ParseError: Invalid syntax".to_string(),
-                ParseError::Other => panic!("Something went horribly wrong"),
             }
         };
 
